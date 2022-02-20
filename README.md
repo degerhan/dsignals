@@ -1,27 +1,31 @@
 # dsignals
 
-Utilities and information for the signals.numer.ai tournament
+Utilities and information for the signals.numer.ai tournament.
 
-## using eodhistoricaldata.com
+## Working with eodhistoricaldata.com
 
-eodhistoricaldata.com provides excellent historical price coverage for the signals universe. There are two main challenges with it:
+eodhistoricaldata.com provides excellent ticker coverage (including delisted Signals tickers) for historical prices. While a free tier is available, I recommend the "EOD Historical Data - All World" package at $19.99/mo to make the most of dsignals.
 
-1. Ticker mapping from bloomberg to eod tickers
-2. Lack of coverage for Japan, Czech Republic and New Zealand
+dsignals solves the two main challenges with using eodhistoricaldata in Signals:
 
-### Building the ticker map
+- `build_eodhd_map.py` generates the ticker mappings from bloomberg_ticker.
+- `download_quotes.py` provides comprehensive global coverage by downloading from eodhistoricaldata on its supported stock exchanges, and from yahoo for Japan, Czech Republic and New Zealand.
 
-To build the mapping from bloomberg_ticker to eodhd, use:
+### Generate the ticker map
+
+To generate the up-to-date ticker mappings for the entire Signals universe (live and historical), run:
 
     python build_eodhd_map.py
 
-This will retrieve:
+Step 1, this will download and merge tickers from three sources:
 
-- live_universe (a small 40 KB file just listing the ~5,340 tickers in current round)
+- live_universe (a small 40 KB file with the ~5,340 tickers for the current round)
 - historical_targets (a large 150 MB file, and extract ~13,370 unique historical tickers)
 - the bloomberg to yahoo map courtesy of Liam @ numerai
 
-And follow the conversion logic in the python code and manual overrides in `db/eod-overrides.csv` to build `eodhd-map.csv` in the following format:
+Step 2, tickers are mapped, and overrides in `db/eodhd-overrides.csv` are applied.
+
+Step 3, `db/eodhd-map.csv` is generated in the following format:
 
 | bloomberg_ticker | yahoo | data_provider | signals_ticker |
 |---|---|---|---|
@@ -30,16 +34,29 @@ And follow the conversion logic in the python code and manual overrides in `db/e
 | CAO US |   | eodhd | CAO.US |
 | 7013 JP | 7013.T | yahoo | 7013.T |
 
-### Download quotes from the correct data_provider
+### Download historical data
 
-First find `EODHD_TOKEN = "put_your_token_here"` in the `download_quotes.py` file and insert your eodhd api token. Then running:
+There are two ways to specify your eodhistoricaldata API token for use by `download_quotes.py`:
+
+- set "NUMERAI_EODHD_TOKEN" environment variable:
+
+    linux: `export NUMERAI_EODHD_TOKEN="your_eodhd_api_key"`
+
+    windows: `set NUMERAI_EODHD_TOKEN="your_eodhd_api_key"`
+
+- or, edit `download_quotes.py` and replace `"your_eodhd_api_key"` with your API token.
+
+To start the download, run:
 
     python download_quotes.py
 
-will download each quote from the appropriate source (eodhd or yahoo) saving each ticker to a separate pickle file under ./data/ticker_bin. As of October 2021, this results in 10,900+ ticker histories.
+This will download price data from either eodhistoricaldata or yahoo, and save each ticker to a separate pickle file in the `data/ticker_bin` folder. As of February 2022, this yields price data for 11,200+ tickers.
 
-### How you can help
+### Read the downloaded quotes
 
-- Some amount of experimentation is needed with Korean tickers (KO vs KQ extension) to get better fills for ~50 tickers.
-- Bloomberg Singapore ticker prefixes are very different than the yahoo or eodhd tickers. We are extracting the live universe prefixes from numerai yahoo map, but historical Singapore tickers would need to be manually mapped if anyone is up for the challenge.
-- The rest of the tickers seem to work well -- all feedback and advice is appreciated.
+Example code to receive a pandas DataFrame for a given bloomberg_ticker:
+
+    from download_quotes import read_quotes
+    quotes = read_quotes("MSFT US")
+
+Alternatively, copy the `make_filename_safe()` function to your codefile to generate the name of the pickle file for a given ticker, and read the pickle file directly with `pd.read_pickle(filename)`.
