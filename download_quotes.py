@@ -1,3 +1,4 @@
+import os
 import logging
 import time
 from pathlib import Path
@@ -6,66 +7,50 @@ import re
 from concurrent import futures
 
 import pandas as pd
+from tqdm import tqdm
 
 from build_eodhd_map import MAP_YAHOO, MAP_EODHD
 
 _logger = logging.getLogger(__name__)
 
-# Put your eodhistoricaldata.com API token here
-EODHD_TOKEN = "put_your_token_here"
+# Read eodhistoricaldata.com token fron environment -- or insert into code
+EODHD_TOKEN = os.getenv("NUMERAI_EODHD_TOKEN", "your_eodhd_api_key")
 
 DB_FOLDER = Path("./db/")
 DATA_FOLDER = Path("./data/")
 MAP_FILE = DB_FOLDER / "eodhd-map.csv"
 QUOTE_FOLDER = Path(DATA_FOLDER / "ticker_bin")
 
-YAHOO_RETRY_COUNT = 3
-YAHOO_RETRY_WAIT = 10
-
-MAX_WORKERS = 8
+_RETRY_COUNT = 3
+_RETRY_WAIT = 25
+_MAX_WORKERS = 10
 
 
 def yahoo_download_one(signals_ticker: str) -> pd.DataFrame:
     start_epoch = int(946684800)  # 2000-01-01
     end_epoch = int(time.time())
     quotes = None
-    success = False
 
-    for _ in range(0, YAHOO_RETRY_COUNT):
-        if success:
-            break
-        else:
-            try:
-                quotes = (
-                    pd.read_csv(
-                        f"https://query1.finance.yahoo.com/v7/finance/download/{signals_ticker}?period1={start_epoch}&period2={end_epoch}&interval=1d&events=history&includeAdjustedClose=true"
-                    )
-                    .dropna()
-                    .set_index("Date")
-                )
+    quotes = (
+        pd.read_csv(
+            f"https://query1.finance.yahoo.com/v7/finance/download/{signals_ticker}?period1={start_epoch}&period2={end_epoch}&interval=1d&events=history&includeAdjustedClose=true"
+        )
+        .dropna()
+        .set_index("Date")
+    )
 
-                if len(quotes) > 1:
-                    quotes["date64"] = pd.to_datetime(quotes.index, format="%Y-%m-%d")
-                    quotes = (
-                        quotes.reset_index(drop=True).set_index("date64").sort_index()
-                    )
-                    quotes.index.name = "date"
-                    quotes.columns = quotes.columns = [
-                        "open",
-                        "high",
-                        "low",
-                        "close",
-                        "adjusted_close",
-                        "volume",
-                    ]
-
-                    success = True
-
-            except Exception as ex:
-                _logger.warning(
-                    f"yahoo_download_one, error, ticker:{signals_ticker}, exception:{ex}"
-                )
-                time.sleep(YAHOO_RETRY_WAIT)
+    if quotes is not None and len(quotes) > 1:
+        quotes["date64"] = pd.to_datetime(quotes.index, format="%Y-%m-%d")
+        quotes = quotes.reset_index(drop=True).set_index("date64").sort_index()
+        quotes.index.name = "date"
+        quotes.columns = [
+            "open",
+            "high",
+            "low",
+            "close",
+            "adjusted_close",
+            "volume",
+        ]
 
     return quotes
 
@@ -74,8 +59,7 @@ def eodhd_download_one(signals_ticker: str) -> pd.DataFrame:
     start_date = "2000-01-01"
     quotes = None
 
-    session = requests.Session()
-    r = session.get(
+    r = requests.get(
         f"https://eodhistoricaldata.com/api/eod/{signals_ticker}?from={start_date}&fmt=json&api_token={EODHD_TOKEN}"
     )
 
@@ -85,7 +69,7 @@ def eodhd_download_one(signals_ticker: str) -> pd.DataFrame:
             quotes["date64"] = pd.to_datetime(quotes.index, format="%Y-%m-%d")
             quotes = quotes.reset_index(drop=True).set_index("date64").sort_index()
             quotes.index.name = "date"
-            quotes.columns = quotes.columns = [
+            quotes.columns = [
                 "open",
                 "high",
                 "low",
@@ -98,19 +82,26 @@ def eodhd_download_one(signals_ticker: str) -> pd.DataFrame:
 
 
 def download_one(bloomberg_ticker: str, map: pd.DataFrame):
-    print(".", end="")
-
+    yahoo_ticker = map.loc[bloomberg_ticker, "yahoo"]
     signals_ticker = map.loc[bloomberg_ticker, "signals_ticker"]
+    data_provider = map.loc[bloomberg_ticker, "data_provider"]
+
     if pd.isnull(signals_ticker):
         return bloomberg_ticker, None
 
     quotes = None
-    data_provider = map.loc[bloomberg_ticker, "data_provider"]
-    if data_provider == MAP_EODHD:
-        quotes = eodhd_download_one(signals_ticker)
-        pass
-    elif data_provider == MAP_YAHOO:
-        quotes = yahoo_download_one(signals_ticker)
+    for _ in range(_RETRY_COUNT):
+        try:
+            if data_provider == MAP_EODHD:
+                quotes = eodhd_download_one(signals_ticker)
+            elif data_provider == MAP_YAHOO:
+                quotes = yahoo_download_one(signals_ticker)
+
+            break
+
+        except Exception as ex:
+            _logger.warning(f"download_one, ticker:{bloomberg_ticker}, exception:{ex}")
+            time.sleep(_RETRY_WAIT)
 
     return bloomberg_ticker, quotes
 
@@ -120,11 +111,10 @@ def make_filename_safe(bloomberg_ticker):
 
 
 def download_save_all(ticker_map):
-    tickers = ticker_map.index
+    # Shuffle the download order to balance load and wait times with data providers
+    tickers = pd.Series(ticker_map.index).sample(frac=1).unique().tolist()
 
-    QUOTE_FOLDER.mkdir(exist_ok=True, parents=True)
-
-    with futures.ThreadPoolExecutor(MAX_WORKERS) as executor:
+    with futures.ThreadPoolExecutor(_MAX_WORKERS) as executor:
         _futures = []
         for ticker in tickers:
             _futures.append(
@@ -135,14 +125,24 @@ def download_save_all(ticker_map):
                 )
             )
 
-        for future in futures.as_completed(_futures):
+        for future in tqdm(futures.as_completed(_futures), total=len(tickers)):
             bloomberg_ticker, quotes = future.result()
             if quotes is not None:
                 quotes.to_pickle(QUOTE_FOLDER / make_filename_safe(bloomberg_ticker))
 
 
+def read_quotes(bloomberg_ticker):
+    filename = Path(QUOTE_FOLDER / make_filename_safe(bloomberg_ticker))
+    if filename.exists():
+        quotes = pd.read_pickle(filename)
+        return quotes
+    else:
+        return None
+
+
 def main():
     map = pd.read_csv(MAP_FILE, index_col=0)
+    QUOTE_FOLDER.mkdir(exist_ok=True, parents=True)
     download_save_all(map)
 
 
