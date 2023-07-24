@@ -57,7 +57,7 @@ converters = {
     "IT": ConverterItem(EODHD, BBG, EODHD, ".TA"),
     "JP": ConverterItem(YAHOO, YAHOO, YAHOO),
     "JX": ConverterItem(IGNORE),
-    "KS": ConverterItem(EODHD, BBG, EODHD, ".KQ"),
+    "KS": ConverterItem(EODHD, BBG, EODHD, ".KO"),
     "LN": ConverterItem(EODHD, BBG, EODHD, ".LSE"),
     "MF": ConverterItem(EODHD, BBG, EODHD, ".MX"),
     "MK": ConverterItem(EODHD, YAHOO, EODHD, ".KLSE"),
