@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import re
@@ -11,7 +12,7 @@ import pandas as pd
 import requests
 from tqdm import tqdm
 
-from build_eodhd_map import EODHD, YAHOO
+from build_eodhd_map import EODHD, YAHOO, get_live_universe_bbg
 
 _logger = logging.getLogger(__name__)
 
@@ -175,7 +176,20 @@ def read_quotes(ticker) -> pd.DataFrame:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "universe",
+        choices=["ALL", "LIVE"],
+        nargs="?",
+        default="ALL",
+        help="download quotes for the complete historical ticker universe or only the live tickers",
+    )
+    args = parser.parse_args()
+
     map = pd.read_csv(MAP_FILE, index_col=0)
+    if args.universe == "LIVE":
+        live_tickers = get_live_universe_bbg()
+        map = map[map.index.isin(live_tickers)]
 
     QUOTE_FOLDER.mkdir(exist_ok=True, parents=True)
     with open(STATUS_FILE, "w") as file:
