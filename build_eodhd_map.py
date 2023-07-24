@@ -1,17 +1,18 @@
-import logging
-import collections
-import pandas as pd
+from __future__ import annotations
 
+import collections
+import logging
 from pathlib import Path
+
+import pandas as pd
 
 _logger = logging.getLogger(__name__)
 
-MAP_IGNORE = "ignore"
-MAP_YAHOO = "yahoo"
-MAP_EODHD = "eodhd"
-
-_BBG = "bbg"
-_FIXUPHK = "fixuphk"
+IGNORE = "ignore"
+YAHOO = "yahoo"
+EODHD = "eodhd"
+BBG = "bbg"
+FIXUPHK = "fixuphk"
 
 AWS_BASE_URL = "https://numerai-signals-public-data.s3-us-west-2.amazonaws.com"
 SIGNALS_UNIVERSE = f"{AWS_BASE_URL}/latest_universe.csv"
@@ -25,58 +26,58 @@ MAP_EXPORT = DB_FOLDER / "eodhd-map.csv"
 ConverterItem = collections.namedtuple(
     "ConverterItem",
     [
-        "data_provider",  # {eodhd | yahoo | clean}
-        "ticker_source",  # [bbg | yahoo | fixuphk]
-        "suffix_source",  # [eodhd | yahoo]
+        "data_provider",  # {eodhd, yahoo, ignore}
+        "ticker_source",  # {bbg, yahoo, fixuphk}
+        "suffix_source",  # {eodhd, yahoo}
         "eodhd_suffix",
     ],
-    defaults=(MAP_EODHD, _BBG, MAP_EODHD, ""),
+    defaults=(EODHD, BBG, EODHD, ""),
 )
 
 converters = {
-    "AU": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".AU"),
-    "AV": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".VI"),
-    "BB": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".BR"),
-    "BZ": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".SA"),
-    "CA": ConverterItem(MAP_IGNORE),
-    "CH": ConverterItem(MAP_IGNORE),
-    "CN": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".TO"),
-    "CP": ConverterItem(MAP_YAHOO, MAP_YAHOO, MAP_YAHOO),
-    "DC": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".CO"),
-    "FH": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".HE"),
-    "FP": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".PA"),
-    "GA": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".AT"),
-    "GR": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".XETRA"),
-    "GY": ConverterItem(MAP_IGNORE),
-    "HB": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".BUD"),
-    "HK": ConverterItem(MAP_EODHD, _FIXUPHK, MAP_EODHD, ".HK"),
-    "ID": ConverterItem(MAP_EODHD, MAP_YAHOO, MAP_EODHD, ".IR"),
-    "IJ": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".JK"),
-    "IM": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".MI"),
-    "IT": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".TA"),
-    "JP": ConverterItem(MAP_YAHOO, MAP_YAHOO, MAP_YAHOO),
-    "JX": ConverterItem(MAP_IGNORE),
-    "KS": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".KQ"),
-    "LN": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".LSE"),
-    "MF": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".MX"),
-    "MK": ConverterItem(MAP_EODHD, MAP_YAHOO, MAP_EODHD, ".KLSE"),
-    "NA": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".AS"),
-    "NO": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".OL"),
-    "NZ": ConverterItem(MAP_YAHOO, MAP_YAHOO, MAP_YAHOO),
-    "PL": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".LS"),
-    "PM": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".PSE"),
-    "PW": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".WAR"),
-    "SJ": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".JSE"),
-    "SM": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".MC"),
-    "SP": ConverterItem(MAP_EODHD, MAP_YAHOO, MAP_EODHD, ".SG"),
-    "SS": ConverterItem(MAP_EODHD, MAP_YAHOO, MAP_EODHD, ".ST"),
-    "SW": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".SW"),
-    "TB": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".BK"),
-    "TI": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".IS"),
-    "TT": ConverterItem(MAP_EODHD, _BBG, MAP_YAHOO, ".TW"),
-    "TW": ConverterItem(MAP_IGNORE),
-    "UQ": ConverterItem(MAP_IGNORE),
-    "US": ConverterItem(MAP_EODHD, _BBG, MAP_EODHD, ".US"),
+    "AU": ConverterItem(EODHD, BBG, EODHD, ".AU"),
+    "AV": ConverterItem(EODHD, BBG, EODHD, ".VI"),
+    "BB": ConverterItem(EODHD, BBG, EODHD, ".BR"),
+    "BZ": ConverterItem(EODHD, BBG, EODHD, ".SA"),
+    "CA": ConverterItem(IGNORE),
+    "CH": ConverterItem(IGNORE),
+    "CN": ConverterItem(EODHD, BBG, EODHD, ".TO"),
+    "CP": ConverterItem(YAHOO, YAHOO, YAHOO),
+    "DC": ConverterItem(EODHD, BBG, EODHD, ".CO"),
+    "FH": ConverterItem(EODHD, BBG, EODHD, ".HE"),
+    "FP": ConverterItem(EODHD, BBG, EODHD, ".PA"),
+    "GA": ConverterItem(EODHD, BBG, EODHD, ".AT"),
+    "GR": ConverterItem(EODHD, BBG, EODHD, ".XETRA"),
+    "GY": ConverterItem(IGNORE),
+    "HB": ConverterItem(EODHD, BBG, EODHD, ".BUD"),
+    "HK": ConverterItem(EODHD, FIXUPHK, EODHD, ".HK"),
+    "ID": ConverterItem(EODHD, YAHOO, EODHD, ".IR"),
+    "IJ": ConverterItem(EODHD, BBG, EODHD, ".JK"),
+    "IM": ConverterItem(EODHD, BBG, EODHD, ".MI"),
+    "IT": ConverterItem(EODHD, BBG, EODHD, ".TA"),
+    "JP": ConverterItem(YAHOO, YAHOO, YAHOO),
+    "JX": ConverterItem(IGNORE),
+    "KS": ConverterItem(EODHD, BBG, EODHD, ".KQ"),
+    "LN": ConverterItem(EODHD, BBG, EODHD, ".LSE"),
+    "MF": ConverterItem(EODHD, BBG, EODHD, ".MX"),
+    "MK": ConverterItem(EODHD, YAHOO, EODHD, ".KLSE"),
+    "NA": ConverterItem(EODHD, BBG, EODHD, ".AS"),
+    "NO": ConverterItem(EODHD, BBG, EODHD, ".OL"),
+    "NZ": ConverterItem(YAHOO, YAHOO, YAHOO),
+    "PL": ConverterItem(EODHD, BBG, EODHD, ".LS"),
+    "PM": ConverterItem(EODHD, BBG, EODHD, ".PSE"),
+    "PW": ConverterItem(EODHD, BBG, EODHD, ".WAR"),
+    "SJ": ConverterItem(EODHD, BBG, EODHD, ".JSE"),
+    "SM": ConverterItem(EODHD, BBG, EODHD, ".MC"),
+    "SP": ConverterItem(EODHD, YAHOO, EODHD, ".SG"),
+    "SS": ConverterItem(EODHD, YAHOO, EODHD, ".ST"),
+    "SW": ConverterItem(EODHD, BBG, EODHD, ".SW"),
+    "TB": ConverterItem(EODHD, BBG, EODHD, ".BK"),
+    "TI": ConverterItem(EODHD, BBG, EODHD, ".IS"),
+    "TT": ConverterItem(EODHD, BBG, YAHOO, ".TW"),
+    "TW": ConverterItem(IGNORE),
+    "UQ": ConverterItem(IGNORE),
+    "US": ConverterItem(EODHD, BBG, EODHD, ".US"),
 }
 
 replacements = [
@@ -92,33 +93,30 @@ replacements = [
 ]
 
 
-def _get_historical_universe_bbg():
-    _logger.info(f"_get_historical_universe_bbg, read historical targets from network")
+def get_historical_universe_bbg() -> set:
+    _logger.info(f"get_historical_universe_bbg, reading from network")
 
     historical_targets = pd.read_csv(SIGNALS_TARGETS)
-    universe = historical_targets.bloomberg_ticker.unique()
+    universe = set(historical_targets.bloomberg_ticker)
+
+    _logger.info(f"get_historical_universe_bbg, unique symbols:{len(universe)}")
+
     return universe
 
 
-def _get_live_universe_bbg():
-    _logger.info(f"_get_live_universe_bbg, read from network")
+def get_live_universe_bbg() -> set:
+    _logger.info(f"get_live_universe_bbg, reading from network")
 
-    universe = pd.read_csv(SIGNALS_UNIVERSE, squeeze=True).drop_duplicates()
+    universe = set(pd.read_csv(SIGNALS_UNIVERSE).squeeze("columns"))
+
+    _logger.info(f"get_live_universe_bbg, unique symbols:{len(universe)}")
+
     return universe
 
 
-def _get_delisted_universe_bbg(historical_universe_bbg, live_universe_bbg):
-    delisted_bbg_set = set(historical_universe_bbg) - set(live_universe_bbg)
-    return delisted_bbg_set
+def get_yahoo_map() -> tuple[dict, dict]:
+    _logger.info(f"get_yahoo_map, reading from network")
 
-
-def _get_complete_universe_bbg(historical_universe_bbg, live_universe_bbg):
-    complete_universe_bbg = set(historical_universe_bbg).union(set(live_universe_bbg))
-    return complete_universe_bbg
-
-
-def _get_yahoo_map():
-    _logger.info(f"_get_yahoo_map, read from network")
     ticker_map = (
         pd.read_csv(SIGNALS_TICKER_MAP)
         .dropna()
@@ -130,57 +128,50 @@ def _get_yahoo_map():
     map_bbg_to_yahoo = dict(zip(ticker_map["bloomberg_ticker"], ticker_map["yahoo"]))
     map_yahoo_to_bbg = dict(zip(ticker_map["yahoo"], ticker_map["bloomberg_ticker"]))
 
+    _logger.info(f"get_yahoo_map, unique symbols:{len(map_bbg_to_yahoo)}")
+
     return map_bbg_to_yahoo, map_yahoo_to_bbg
 
 
-def build_eodhd_map(bbg_universe: set) -> pd.DataFrame:
-    map_bbg_to_yahoo, _ = _get_yahoo_map()
-    _logger.info(f"map_bbg_to_yahoo, unique symbols:{len(map_bbg_to_yahoo)}")
+def build_eodhd_map(universe_bbg: set) -> pd.DataFrame:
+    map_bbg_to_yahoo, _ = get_yahoo_map()
 
     overrides_df = pd.read_csv(OVERRIDE_DB)
     overrides_dict = dict(zip(overrides_df["old"], overrides_df["new"]))
     _logger.info(f"overrides_dict, count:{len(overrides_dict)}")
 
     eodhd_map_list = []
-    for bbg_ticker in bbg_universe:
+    for ticker in universe_bbg:
         # tickers without a recognized converter or exchange code will be marked IGNORE
         signals_ticker = ""
-        data_provider = MAP_IGNORE
+        data_provider = IGNORE
 
         # bloomberg_ticker suffix is the exchange code
-        bbg_suffix = bbg_ticker.rpartition(" ")[2]
+        bbg_suffix = ticker.rpartition(" ")[2]
 
         converter = converters.get(bbg_suffix)
         if converter is not None:
             data_provider = converter.data_provider
 
             # First, build the signals_ticker from bloomberg_ticker using converters
-            if converter.data_provider == MAP_IGNORE:
+            if converter.data_provider == IGNORE:
                 pass
-            elif (
-                converter.data_provider == MAP_YAHOO and bbg_ticker in map_bbg_to_yahoo
-            ):
-                signals_ticker = map_bbg_to_yahoo[bbg_ticker]
-            elif converter.data_provider == MAP_EODHD:
-                if converter.ticker_source == _BBG:
-                    prefix = bbg_ticker.rpartition(" ")[0]
-                elif (
-                    converter.ticker_source == MAP_YAHOO
-                    and bbg_ticker in map_bbg_to_yahoo
-                ):
-                    prefix = map_bbg_to_yahoo[bbg_ticker].rpartition(".")[0]
-                elif converter.ticker_source == _FIXUPHK:
-                    prefix = bbg_ticker.rpartition(" ")[0].zfill(4)
+            elif converter.data_provider == YAHOO and ticker in map_bbg_to_yahoo:
+                signals_ticker = map_bbg_to_yahoo[ticker]
+            elif converter.data_provider == EODHD:
+                if converter.ticker_source == BBG:
+                    prefix = ticker.rpartition(" ")[0]
+                elif converter.ticker_source == YAHOO and ticker in map_bbg_to_yahoo:
+                    prefix = map_bbg_to_yahoo[ticker].rpartition(".")[0]
+                elif converter.ticker_source == FIXUPHK:
+                    prefix = ticker.rpartition(" ")[0].zfill(4)
                 else:
-                    prefix = bbg_ticker.rpartition(" ")[0]
+                    prefix = ticker.rpartition(" ")[0]
 
-                if converter.suffix_source == MAP_EODHD:
+                if converter.suffix_source == EODHD:
                     suffix = converter.eodhd_suffix
-                elif (
-                    converter.suffix_source == MAP_YAHOO
-                    and bbg_ticker in map_bbg_to_yahoo
-                ):
-                    suffix = "." + map_bbg_to_yahoo[bbg_ticker].rpartition(".")[2]
+                elif converter.suffix_source == YAHOO and ticker in map_bbg_to_yahoo:
+                    suffix = "." + map_bbg_to_yahoo[ticker].rpartition(".")[2]
                 else:
                     suffix = converter.eodhd_suffix
 
@@ -195,14 +186,12 @@ def build_eodhd_map(bbg_universe: set) -> pd.DataFrame:
                 signals_ticker = overrides_dict[signals_ticker]
 
         # add liam's yahoo ticker to the final map for comparison and debugging
-        yahoo_ticker = (
-            map_bbg_to_yahoo[bbg_ticker] if bbg_ticker in map_bbg_to_yahoo else ""
-        )
+        yahoo_ticker = map_bbg_to_yahoo.get(ticker, "")
 
         # Add entry to the map
         eodhd_map_list.append(
             {
-                "bloomberg_ticker": bbg_ticker,
+                "bloomberg_ticker": ticker,
                 "yahoo": yahoo_ticker,
                 "data_provider": data_provider,
                 "signals_ticker": signals_ticker,
@@ -215,17 +204,14 @@ def build_eodhd_map(bbg_universe: set) -> pd.DataFrame:
 
 
 def main():
-    historical_bbg = _get_historical_universe_bbg()
-    _logger.info(f"historical_universe_bbg, unique symbols:{len(historical_bbg)}")
+    historical_bbg = get_historical_universe_bbg()
+    live_bbg = get_live_universe_bbg()
+    universe_bbg = historical_bbg.union(live_bbg)
+    _logger.info(f"complete universe_bbg, unique symbols:{len(universe_bbg)}")
 
-    live_bbg = _get_live_universe_bbg()
-    _logger.info(f"live_universe_bbg, unique symbols:{len(live_bbg)}")
-
-    bbg_universe = _get_complete_universe_bbg(historical_bbg, live_bbg)
-    _logger.info(f"complete_universe_bbg, unique symbols:{len(bbg_universe)}")
-
-    map = build_eodhd_map(bbg_universe)
+    map = build_eodhd_map(universe_bbg)
     map.to_csv(MAP_EXPORT, index=True, header=True)
+
     _logger.info(f"saved: {MAP_EXPORT}, rows:{len(map)}")
 
 

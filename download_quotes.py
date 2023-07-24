@@ -1,25 +1,25 @@
-import os
+from __future__ import annotations
+
 import logging
-import time
-from pathlib import Path
-import requests
+import os
 import re
+import time
 from concurrent import futures
+from pathlib import Path
 
 import pandas as pd
+import requests
 from tqdm import tqdm
 
-from build_eodhd_map import MAP_YAHOO, MAP_EODHD
+from build_eodhd_map import EODHD, YAHOO
 
 _logger = logging.getLogger(__name__)
 
 # Read eodhistoricaldata.com token fron environment -- or insert into code
 EODHD_TOKEN = os.getenv("NUMERAI_EODHD_TOKEN", "your_eodhd_api_key")
 
-DB_FOLDER = Path("./db/")
-DATA_FOLDER = Path("./data/")
-MAP_FILE = DB_FOLDER / "eodhd-map.csv"
-QUOTE_FOLDER = Path(DATA_FOLDER / "ticker_bin")
+MAP_FILE = Path("./db/eodhd-map.csv")
+QUOTE_FOLDER = Path("./data/ticker_bin")
 
 _RETRY_COUNT = 3
 _RETRY_WAIT = 25
@@ -92,9 +92,9 @@ def download_one(bloomberg_ticker: str, map: pd.DataFrame):
     quotes = None
     for _ in range(_RETRY_COUNT):
         try:
-            if data_provider == MAP_EODHD:
+            if data_provider == EODHD:
                 quotes = eodhd_download_one(signals_ticker)
-            elif data_provider == MAP_YAHOO:
+            elif data_provider == YAHOO:
                 quotes = yahoo_download_one(signals_ticker)
 
             break
@@ -131,8 +131,8 @@ def download_save_all(ticker_map):
                 quotes.to_pickle(QUOTE_FOLDER / make_filename_safe(bloomberg_ticker))
 
 
-def read_quotes(bloomberg_ticker):
-    filename = Path(QUOTE_FOLDER / make_filename_safe(bloomberg_ticker))
+def read_quotes(ticker) -> pd.DataFrame:
+    filename = Path(QUOTE_FOLDER / make_filename_safe(ticker))
     if filename.exists():
         quotes = pd.read_pickle(filename)
         return quotes
