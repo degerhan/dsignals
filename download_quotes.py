@@ -20,13 +20,21 @@ EODHD_TOKEN = os.getenv("NUMERAI_EODHD_TOKEN", "your_eodhd_api_key")
 
 MAP_FILE = Path("./db/eodhd-map.csv")
 QUOTE_FOLDER = Path("./data/ticker_bin")
+STATUS_FILE = QUOTE_FOLDER / "download_status.csv"
 
 _RETRY_COUNT = 3
 _RETRY_WAIT = 25
 _MAX_WORKERS = 10
 
 
-def yahoo_download_one(signals_ticker: str) -> pd.DataFrame:
+def write_status(bbg_ticker, yahoo_ticker, provider, signals_ticker, count, status):
+    with open(STATUS_FILE, "a") as file:
+        file.write(
+            f"{bbg_ticker},{yahoo_ticker},{provider},{signals_ticker},{count},{status}\n"
+        )
+
+
+def yahoo_download_one(signals_ticker: str) -> tuple[pd.DataFrame, int]:
     start_epoch = int(946684800)  # 2000-01-01
     end_epoch = int(time.time())
     quotes = None
@@ -52,10 +60,10 @@ def yahoo_download_one(signals_ticker: str) -> pd.DataFrame:
             "volume",
         ]
 
-    return quotes
+    return quotes, 0
 
 
-def eodhd_download_one(signals_ticker: str) -> pd.DataFrame:
+def eodhd_download_one(signals_ticker: str) -> tuple[pd.DataFrame, int]:
     start_date = "2000-01-01"
     quotes = None
 
@@ -78,7 +86,7 @@ def eodhd_download_one(signals_ticker: str) -> pd.DataFrame:
                 "volume",
             ]
 
-    return quotes
+    return quotes, r.status_code
 
 
 def download_one(bloomberg_ticker: str, map: pd.DataFrame):
@@ -87,20 +95,46 @@ def download_one(bloomberg_ticker: str, map: pd.DataFrame):
     data_provider = map.loc[bloomberg_ticker, "data_provider"]
 
     if pd.isnull(signals_ticker):
+        write_status(
+            bloomberg_ticker,
+            yahoo_ticker,
+            data_provider,
+            signals_ticker,
+            -1,
+            "signals_ticker cannot be null",
+        )
         return bloomberg_ticker, None
 
     quotes = None
     for _ in range(_RETRY_COUNT):
         try:
             if data_provider == EODHD:
-                quotes = eodhd_download_one(signals_ticker)
+                quotes, status_code = eodhd_download_one(signals_ticker)
             elif data_provider == YAHOO:
-                quotes = yahoo_download_one(signals_ticker)
+                quotes, status_code = yahoo_download_one(signals_ticker)
+
+            count = len(quotes) if quotes is not None else -1
+            write_status(
+                bloomberg_ticker,
+                yahoo_ticker,
+                data_provider,
+                signals_ticker,
+                count,
+                status_code,
+            )
 
             break
 
         except Exception as ex:
             _logger.warning(f"download_one, ticker:{bloomberg_ticker}, exception:{ex}")
+            write_status(
+                bloomberg_ticker,
+                yahoo_ticker,
+                data_provider,
+                signals_ticker,
+                -3,
+                ex,
+            )
             time.sleep(_RETRY_WAIT)
 
     return bloomberg_ticker, quotes
@@ -142,7 +176,13 @@ def read_quotes(ticker) -> pd.DataFrame:
 
 def main():
     map = pd.read_csv(MAP_FILE, index_col=0)
+
     QUOTE_FOLDER.mkdir(exist_ok=True, parents=True)
+    with open(STATUS_FILE, "w") as file:
+        file.write(
+            f"bloomberg_ticker,yahoo_ticker,data_provider,signals_ticker,count,status\n"
+        )
+
     download_save_all(map)
 
 
