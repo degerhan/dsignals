@@ -198,7 +198,7 @@ def build_eodhd_map(universe_bbg: set) -> pd.DataFrame:
             }
         )
 
-    map = pd.DataFrame(eodhd_map_list).set_index("bloomberg_ticker")
+    map = pd.DataFrame(eodhd_map_list).set_index("bloomberg_ticker").sort_index()
 
     return map
 
