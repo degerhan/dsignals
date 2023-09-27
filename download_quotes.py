@@ -6,6 +6,7 @@ import os
 import re
 import time
 from concurrent import futures
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -35,14 +36,14 @@ def write_status(bbg_ticker, yahoo_ticker, provider, signals_ticker, count, stat
         )
 
 
-def yahoo_download_one(signals_ticker: str) -> tuple[pd.DataFrame, int]:
-    start_epoch = int(946684800)  # 2000-01-01
+def yahoo_download_one(ticker: str, start: datetime) -> tuple[pd.DataFrame, int]:
+    start_epoch = int(start.timestamp())
     end_epoch = int(time.time())
     quotes = None
 
     quotes = (
         pd.read_csv(
-            f"https://query1.finance.yahoo.com/v7/finance/download/{signals_ticker}?period1={start_epoch}&period2={end_epoch}&interval=1d&events=history&includeAdjustedClose=true"
+            f"https://query1.finance.yahoo.com/v7/finance/download/{ticker}?period1={start_epoch}&period2={end_epoch}&interval=1d&events=history&includeAdjustedClose=true"
         )
         .dropna()
         .set_index("Date")
@@ -64,12 +65,12 @@ def yahoo_download_one(signals_ticker: str) -> tuple[pd.DataFrame, int]:
     return quotes, 0
 
 
-def eodhd_download_one(signals_ticker: str) -> tuple[pd.DataFrame, int]:
-    start_date = "2000-01-01"
+def eodhd_download_one(ticker: str, start: datetime) -> tuple[pd.DataFrame, int]:
+    start_date = start.strftime("%Y-%m-%d")
     quotes = None
 
     r = requests.get(
-        f"https://eodhistoricaldata.com/api/eod/{signals_ticker}?from={start_date}&fmt=json&api_token={EODHD_TOKEN}"
+        f"https://eodhistoricaldata.com/api/eod/{ticker}?from={start_date}&fmt=json&api_token={EODHD_TOKEN}"
     )
 
     if r.status_code == requests.codes.ok:
@@ -90,7 +91,11 @@ def eodhd_download_one(signals_ticker: str) -> tuple[pd.DataFrame, int]:
     return quotes, r.status_code
 
 
-def download_one(bloomberg_ticker: str, map: pd.DataFrame):
+def download_one(
+    bloomberg_ticker: str,
+    map: pd.DataFrame,
+    start: datetime,
+) -> tuple[str, pd.DataFrame]:
     yahoo_ticker = map.loc[bloomberg_ticker, "yahoo"]
     signals_ticker = map.loc[bloomberg_ticker, "signals_ticker"]
     data_provider = map.loc[bloomberg_ticker, "data_provider"]
@@ -110,9 +115,9 @@ def download_one(bloomberg_ticker: str, map: pd.DataFrame):
     for _ in range(_RETRY_COUNT):
         try:
             if data_provider == EODHD:
-                quotes, status_code = eodhd_download_one(signals_ticker)
+                quotes, status_code = eodhd_download_one(signals_ticker, start)
             elif data_provider == YAHOO:
-                quotes, status_code = yahoo_download_one(signals_ticker)
+                quotes, status_code = yahoo_download_one(signals_ticker, start)
 
             count = len(quotes) if quotes is not None else -1
             write_status(
@@ -145,7 +150,7 @@ def make_filename_safe(bloomberg_ticker):
     return re.sub(r"[^\w-]", "_", bloomberg_ticker.lower()) + ".pkl"
 
 
-def download_save_all(ticker_map):
+def download_save_all(ticker_map: pd.DataFrame, start: datetime):
     # Shuffle the download order to balance load and wait times with data providers
     tickers = pd.Series(ticker_map.index).sample(frac=1).unique().tolist()
 
@@ -157,6 +162,7 @@ def download_save_all(ticker_map):
                     download_one,
                     bloomberg_ticker=ticker,
                     map=ticker_map,
+                    start=start,
                 )
             )
 
@@ -178,16 +184,20 @@ def read_quotes(ticker) -> pd.DataFrame:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "universe",
-        choices=["ALL", "LIVE"],
-        nargs="?",
-        default="ALL",
-        help="download quotes for the complete historical ticker universe or only the live tickers",
+        "--live",
+        help="download quotes for only the live ticker universe instead of the complete historical ticker universe",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--startdate",
+        help="ticker history start date - format YYYY-MM-DD - defaults to 2000-01-01 if not specified",
+        default="2000-01-01",
     )
     args = parser.parse_args()
+    _logger.info(f"{__file__}, live universe only:{args.live}, start:{args.startdate}")
 
     map = pd.read_csv(MAP_FILE, index_col=0)
-    if args.universe == "LIVE":
+    if args.live:
         live_tickers = get_live_universe_bbg()
         map = map[map.index.isin(live_tickers)]
 
@@ -197,7 +207,8 @@ def main():
             f"bloomberg_ticker,yahoo_ticker,data_provider,signals_ticker,count,status\n"
         )
 
-    download_save_all(map)
+    start = datetime.strptime(args.startdate, "%Y-%m-%d")
+    download_save_all(map, start)
 
 
 if __name__ == "__main__":
