@@ -107,7 +107,7 @@ def get_historical_universe_bbg() -> set:
 def get_live_universe_bbg() -> set:
     _logger.info(f"get_live_universe_bbg, reading from network")
 
-    universe = set(pd.read_csv(SIGNALS_UNIVERSE).squeeze("columns"))
+    universe = set(pd.read_csv(SIGNALS_UNIVERSE).bloomberg_ticker)
 
     _logger.info(f"get_live_universe_bbg, unique symbols:{len(universe)}")
 
