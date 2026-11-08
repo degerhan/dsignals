@@ -1,5 +1,18 @@
 # dsignals
 
+> [!WARNING]
+> **Archived (November 2026). This project is no longer maintained and no longer works as written.**
+>
+> dsignals was built for the 2021–2023 Numerai Signals tournament, when tickers were keyed on `bloomberg_ticker`.
+> Since then the tournament rules and ticker universe have changed. The Numerai data files this code downloads
+> now return HTTP 403, and the Yahoo download endpoint it uses returns 401.
+>
+> If you're working on Signals today, start from Numerai's official docs: https://docs.numer.ai.
+> Ticker maps go stale quickly, so build yours against the current universe. Don't reuse
+> `db/eodhd-map.csv`; it's a snapshot from October 2023.
+>
+> The code and instructions below are kept for reference. MIT licensed, so fork freely.
+
 Utilities and information for the signals.numer.ai tournament.
 
 ## Working with eodhistoricaldata.com
